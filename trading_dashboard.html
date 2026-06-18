@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Trading Dashboard - Dynamic Account & Sims</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #050509;
+            --panel-bg: #0d1117;
+            --panel-border: #1f2937;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --glow-green: rgba(16, 185, 129, 0.2);
+            --glow-red: rgba(239, 68, 68, 0.2);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 30px; }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 320px 1fr 320px;
+            gap: 25px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        h2 { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        /* Inputs */
+        .input-group { margin-bottom: 25px; }
+        .input-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.9rem; }
+        .input-header label { font-weight: 600; color: #d1d5db; }
+        
+        .num-input, .select-input {
+            background: #1f2937;
+            border: 1px solid #374151;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            color: var(--accent-blue);
+            outline: none;
+            transition: all 0.2s;
+        }
+        
+        .num-input { width: 80px; text-align: right; }
+        .select-input { width: 100%; padding: 10px; font-size: 1rem; cursor: pointer; text-align: center; }
+        
+        .num-input:focus, .select-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 8px rgba(59, 130, 246, 0.4); }
+        
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: #374151; border-radius: 3px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--accent-blue); margin-top: -6px; cursor: pointer; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+
+        .btn-apply {
+            background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px;
+        }
+        .btn-apply:hover { transform: translateY(-2px); box-shadow: 0 5px 15px var(--glow-green); }
+
+        /* Metrics */
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .metric-card { background-color: #111827; padding: 20px 15px; border-radius: 12px; text-align: center; border: 1px solid #1f2937; transition: all 0.3s; }
+        .metric-card:hover { border-color: #374151; transform: scale(1.02); }
+        .metric-title { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px; }
+        .metric-value { font-size: 1.5rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+        
+        .val-green { color: var(--accent-green); text-shadow: 0 0 15px var(--glow-green); }
+        .val-red { color: var(--accent-red); text-shadow: 0 0 15px var(--glow-red); }
+        .val-blue { color: var(--accent-blue); }
+
+        .chart-container { position: relative; height: 500px; width: 100%; }
+        .divider { height: 1px; background: var(--panel-border); margin: 25px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard">
+        
+        <div class="panel">
+            <h2>Strategy Config</h2>
+            
+            <div class="input-group">
+                <div class="input-header"><label>ACCOUNT SIZE</label></div>
+                <select id="accountSize" class="select-input" onchange="runSimulation()">
+                    <option value="10000">10k Account</option>
+                    <option value="25000">25k Account</option>
+                    <option value="50000">50k Account</option>
+                    <option value="100000" selected>100k Account</option>
+                    <option value="150000">150k Account</option>
+                    <option value="200000">200k Account</option>
+                </select>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="input-group">
+                <div class="input-header">
+                    <label>SIMULATIONS</label>
+                    <input type="number" id="simsInput" class="num-input" min="10" max="1000" step="10" value="100">
+                </div>
+                <input type="range" id="sims" min="10" max="500" step="10" value="100">
+            </div>
+
+            <div class="input-group">
+                <div class="input-header">
+                    <label>WIN RATE (%)</label>
+                    <input type="number" id="winRateInput" class="num-input" min="1" max="100" step="1" value="45">
+                </div>
+                <input type="range" id="winRate" min="1" max="100" step="1" value="45">
+            </div>
+
+            <div class="input-group">
+                <div class="input-header">
+                    <label>RISK : REWARD (R)</label>
+                    <input type="number" id="rrInput" class="num-input" min="0.1" max="10.0" step="0.1" value="1.5">
+                </div>
+                <input type="range" id="rr" min="0.1" max="5.0" step="0.1" value="1.5">
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="input-group">
+                <div class="input-header">
+                    <label>HARD STOP DD (%)</label>
+                    <input type="number" id="ddInput" class="num-input" min="1" max="50" step="1" value="10">
+                </div>
+                <input type="range" id="dd" min="4" max="20" step="1" value="10">
+            </div>
+            
+            <div class="input-group">
+                <div class="input-header">
+                    <label>COSTS / TRADE ($)</label>
+                    <input type="number" id="costInput" class="num-input" min="0" max="100" step="1" value="5">
+                </div>
+                <input type="range" id="cost" min="0" max="30" step="1" value="5">
+            </div>
+
+            <button class="btn-apply" onclick="runSimulation()">Run Simulation</button>
+        </div>
+
+        <div class="panel" style="display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                <h2 id="chartTitle" style="margin: 0; color: #fff;">Equity Curve</h2>
+                <div style="display: flex; gap: 15px; font-size: 0.8rem;">
+                    <span style="color: var(--accent-green)">🟢 Best</span>
+                    <span style="color: var(--accent-red)">🔴 Worst (Failed)</span>
+                    <span style="color: rgba(59, 130, 246, 0.3)">🔵 95% Confidence</span>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="equityChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Advanced Analytics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-title">PROP FIRM PASS RATE</div>
+                    <div class="metric-value val-green" id="passRate">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">NET EXPECTANCY (R)</div>
+                    <div class="metric-value" id="expectancy">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">GROSS PROFIT FACTOR</div>
+                    <div class="metric-value" id="profitFactor">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">MEDIAN END BALANCE</div>
+                    <div class="metric-value val-blue" id="medianBal">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">AVG WIN STREAK</div>
+                    <div class="metric-value val-green" id="winStreak">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">AVG LOSS STREAK</div>
+                    <div class="metric-value val-red" id="lossStreak">--</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let equityChart = null;
+
+        const controls = [
+            { range: document.getElementById('sims'), input: document.getElementById('simsInput') },
+            { range: document.getElementById('winRate'), input: document.getElementById('winRateInput') },
+            { range: document.getElementById('rr'), input: document.getElementById('rrInput') },
+            { range: document.getElementById('dd'), input: document.getElementById('ddInput') },
+            { range: document.getElementById('cost'), input: document.getElementById('costInput') }
+        ];
+
+        controls.forEach(ctrl => {
+            ctrl.range.addEventListener('input', () => { ctrl.input.value = ctrl.range.value; });
+            ctrl.input.addEventListener('input', () => { ctrl.range.value = ctrl.input.value; });
+        });
+
+        function runSimulation() {
+            const startEquity = parseInt(document.getElementById('accountSize').value);
+            const numSims = parseInt(document.getElementById('simsInput').value) || 100;
+            
+            // Δυναμικός τίτλος που δείχνει Account και Sims
+            document.getElementById('chartTitle').innerText = `Equity Curve (${startEquity/1000}k Account - ${numSims} Sims)`;
+
+            const W = parseFloat(document.getElementById('winRateInput').value) / 100 || 0;
+            const R = parseFloat(document.getElementById('rrInput').value) || 0;
+            const maxDD = parseFloat(document.getElementById('ddInput').value) / 100 || 0;
+            const costPerTrade = parseFloat(document.getElementById('costInput').value) || 0;
+
+            const hardStopEquity = startEquity * (1 - maxDD);
+            
+            const baseRisk = startEquity * 0.01; 
+            const boostMilestone = startEquity * 0.05; 
+            const boostIncrement = baseRisk * 0.25; 
+
+            const grossWin = (baseRisk * R) * W;
+            const grossLoss = baseRisk * (1 - W);
+            const profitFactor = grossWin / (grossLoss === 0 ? 1 : grossLoss);
+            
+            const expectedNetWin = ((baseRisk * R) - costPerTrade) * W;
+            const expectedNetLoss = (baseRisk + costPerTrade) * (1 - W);
+            const netExpectancyDollars = expectedNetWin - expectedNetLoss;
+            const netExpectancyR = netExpectancyDollars / baseRisk;
+
+            document.getElementById('expectancy').innerText = netExpectancyR.toFixed(2) + ' R';
+            document.getElementById('expectancy').className = netExpectancyR > 0 ? 'metric-value val-green' : 'metric-value val-red';
+            document.getElementById('profitFactor').innerText = profitFactor.toFixed(2);
+            document.getElementById('profitFactor').className = profitFactor >= 1.5 ? 'metric-value val-green' : (profitFactor > 1 ? 'metric-value val-blue' : 'metric-value val-red');
+
+            const numTrades = 100;
+            const allEquities = [];
+            let passedChallenges = 0;
+            let totalWinStreak = 0; let totalLossStreak = 0;
+
+            for (let i = 0; i < numSims; i++) {
+                let equity = [startEquity];
+                let currentBalance = startEquity;
+                let isBlown = false;
+                
+                let currentWStreak = 0, currentLStreak = 0;
+                let maxWStreak = 0, maxLStreak = 0;
+
+                for (let t = 0; t < numTrades; t++) {
+                    if (isBlown) { equity.push(0); continue; }
+
+                    const profitSoFar = Math.max(0, currentBalance - startEquity);
+                    const boostTiers = Math.floor(profitSoFar / boostMilestone);
+                    const currentRisk = baseRisk + (boostTiers * boostIncrement);
+
+                    if (Math.random() <= W) {
+                        currentBalance += (currentRisk * R) - costPerTrade;
+                        currentWStreak++;
+                        if(currentLStreak > 0) { maxLStreak = Math.max(maxLStreak, currentLStreak); currentLStreak = 0; }
+                    } else {
+                        currentBalance -= (currentRisk + costPerTrade);
+                        currentLStreak++;
+                        if(currentWStreak > 0) { maxWStreak = Math.max(maxWStreak, currentWStreak); currentWStreak = 0; }
+                    }
+
+                    if (currentBalance <= hardStopEquity) { isBlown = true; currentBalance = 0; }
+                    equity.push(currentBalance);
+                }
+                
+                maxWStreak = Math.max(maxWStreak, currentWStreak);
+                maxLStreak = Math.max(maxLStreak, currentLStreak);
+                totalWinStreak += maxWStreak; totalLossStreak += maxLStreak;
+                
+                if (!isBlown) passedChallenges++;
+                allEquities.push(equity);
+            }
+
+            const passRatePct = (passedChallenges / numSims) * 100;
+            document.getElementById('passRate').innerText = passRatePct.toFixed(0) + '%';
+            document.getElementById('passRate').className = passRatePct >= 80 ? 'metric-value val-green' : (passRatePct >= 50 ? 'metric-value val-blue' : 'metric-value val-red');
+            
+            document.getElementById('winStreak').innerText = (totalWinStreak / numSims).toFixed(1);
+            document.getElementById('lossStreak').innerText = (totalLossStreak / numSims).toFixed(1);
+
+            const endBalances = allEquities.map(arr => arr[arr.length - 1]).filter(bal => bal > 0).sort((a,b) => a-b);
+            const median = endBalances.length > 0 ? endBalances[Math.floor(endBalances.length / 2)] : 0;
+            
+            document.getElementById('medianBal').innerText = '$' + (median/1000).toFixed(1) + 'k';
+
+            drawChart(allEquities, numTrades);
+        }
+
+        function drawChart(dataList, numTrades) {
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            if (equityChart) equityChart.destroy();
+
+            let ciUpper = [], ciLower = [];
+            for (let t = 0; t <= numTrades; t++) {
+                const stepVals = dataList.map(sim => sim[t]).sort((a,b) => a-b);
+                const lowerIdx = Math.floor(dataList.length * 0.05); 
+                const upperIdx = Math.floor(dataList.length * 0.95); 
+                ciLower.push(stepVals[lowerIdx]);
+                ciUpper.push(stepVals[upperIdx]);
+            }
+
+            let datasets = [];
+            let bestIndex = 0, worstIndex = 0;
+            let bestEnd = -Infinity, worstEnd = Infinity;
+
+            dataList.forEach((arr, index) => {
+                const endVal = arr[arr.length - 1];
+                if (endVal > bestEnd) { bestEnd = endVal; bestIndex = index; }
+                if (endVal < worstEnd) { worstEnd = endVal; worstIndex = index; }
+            });
+
+            datasets.push({ label: '95% CI Upper', data: ciUpper, borderColor: 'transparent', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: '+1', pointRadius: 0, tension: 0.1, order: 10 });
+            datasets.push({ label: '95% CI Lower', data: ciLower, borderColor: 'transparent', backgroundColor: 'transparent', fill: false, pointRadius: 0, tension: 0.1, order: 10 });
+
+            dataList.forEach((arr, index) => {
+                let color = 'rgba(156, 163, 175, 0.1)'; // Έκανα το γκρι λίγο πιο αχνό για να μη μπουκώνει η οθόνη με πολλά sims
+                let width = 1; let zIndex = 5;
+
+                if (index === bestIndex) { color = '#10b981'; width = 2; zIndex = 1; }
+                if (index === worstIndex) { color = '#ef4444'; width = 2; zIndex = 1; }
+
+                datasets.push({ label: `Sim ${index}`, data: arr, borderColor: color, borderWidth: width, fill: false, pointRadius: 0, tension: 0.1, order: zIndex });
+            });
+
+            const labels = Array.from({length: numTrades + 1}, (_, i) => i);
+
+            equityChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', maxTicksLimit: 10 } },
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', callback: function(value) { return '$' + value/1000 + 'k'; } } }
+                    },
+                    interaction: { mode: 'none' }, animation: { duration: 800, easing: 'easeOutQuart' } // Μείωσα ελαφρώς το animation time για ταχύτητα
+                }
+            });
+        }
+
+        runSimulation();
+    </script>
+</body>
+</html>
